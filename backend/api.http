@@ -1,0 +1,94 @@
+# lms-mini API — Day 2 verification
+# Usage: REST Client (VS Code extension) or httpYac, or convert to curl below.
+# Run `npm run seed` first to populate COURSE_ID and LESSON_ID values.
+
+@base = http://localhost:3001/api
+
+# Replace with IDs printed by `npm run seed`
+@COURSE_ID = REPLACE_WITH_SEED_COURSE_ID
+@LESSON_ID = REPLACE_WITH_LESSON_ID_FROM_LIST
+
+### Health
+GET {{base}}/health
+
+### ── COURSES ────────────────────────────────────────────────────────────────
+
+### Create course (instructor must be a valid ObjectId — use seed instructor id)
+# @name createCourse
+POST {{base}}/courses
+Content-Type: application/json
+
+{
+  "title": "New Test Course",
+  "description": "A course created via API",
+  "instructor": "REPLACE_WITH_SEED_INSTRUCTOR_ID",
+  "category": "Testing",
+  "published": false
+}
+
+### List all courses
+GET {{base}}/courses
+
+### List published courses only
+GET {{base}}/courses?published=true
+
+### List by category
+GET {{base}}/courses?category=Backend
+
+### Get single course (populates instructor name/email)
+GET {{base}}/courses/{{COURSE_ID}}
+
+### Update course
+PUT {{base}}/courses/{{COURSE_ID}}
+Content-Type: application/json
+
+{
+  "published": true
+}
+
+### Delete course (also cascade-deletes its lessons)
+# DELETE {{base}}/courses/{{COURSE_ID}}
+
+### ── LESSONS ─────────────────────────────────────────────────────────────────
+
+### List lessons for a course (sorted by order)
+GET {{base}}/courses/{{COURSE_ID}}/lessons
+
+### Create lesson for a course
+POST {{base}}/courses/{{COURSE_ID}}/lessons
+Content-Type: application/json
+
+{
+  "title": "Bonus Lesson",
+  "content": "Extra content added via API.",
+  "videoUrl": "https://example.com/bonus",
+  "order": 99
+}
+
+### Get single lesson
+GET {{base}}/lessons/{{LESSON_ID}}
+
+### Update lesson
+PUT {{base}}/lessons/{{LESSON_ID}}
+Content-Type: application/json
+
+{
+  "title": "Updated Lesson Title"
+}
+
+### Delete lesson
+# DELETE {{base}}/lessons/{{LESSON_ID}}
+
+### ── VALIDATION / ERROR PATHS ────────────────────────────────────────────────
+
+### 400 — missing required fields
+POST {{base}}/courses
+Content-Type: application/json
+
+{}
+
+### 400 — invalid ObjectId
+GET {{base}}/courses/notanid
+
+### 404 — course not found
+GET {{base}}/courses/000000000000000000000001
