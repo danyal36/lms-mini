@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
 import { User } from './models/User';
 import { Course } from './models/Course';
 import { Lesson } from './models/Lesson';
 import { Enrollment } from './models/Enrollment';
+
+const SEED_PASSWORD = 'Password123!';
 
 async function seed(): Promise<void> {
   const uri = process.env.MONGO_URI;
@@ -23,11 +26,20 @@ async function seed(): Promise<void> {
   ]);
   console.log('Cleared existing data');
 
+  const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
+
   const instructor = await User.create({
     name: 'Alice Instructor',
     email: 'alice@example.com',
-    passwordHash: 'seed_placeholder_not_a_real_hash',
+    passwordHash,
     role: 'instructor',
+  });
+
+  const student = await User.create({
+    name: 'Bob Student',
+    email: 'bob@example.com',
+    passwordHash,
+    role: 'student',
   });
 
   const [webDev, nodeApi] = await Course.insertMany([
@@ -57,7 +69,10 @@ async function seed(): Promise<void> {
   ]);
 
   console.log('\nSeed complete');
+  console.log('Instructor  : alice@example.com / Password123!');
+  console.log('Student     : bob@example.com   / Password123!');
   console.log('Instructor id :', instructor._id.toString());
+  console.log('Student id    :', student._id.toString());
   console.log('Course 1 id   :', webDev._id.toString(), '(published)');
   console.log('Course 2 id   :', nodeApi._id.toString(), '(draft)');
 

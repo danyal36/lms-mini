@@ -11,24 +11,25 @@ function validId(id: string): boolean {
 interface CreateCourseBody {
   title?: string;
   description?: string;
-  instructor?: string;
   category?: string;
   published?: boolean;
 }
 
 export async function createCourse(req: Request, res: Response): Promise<void> {
-  const { title, description, instructor, category, published } = req.body as CreateCourseBody;
+  const { title, description, category, published } = req.body as CreateCourseBody;
 
-  if (!title || !description || !instructor || !category) {
-    res.status(400).json({ error: 'title, description, instructor, and category are required' });
-    return;
-  }
-  if (!validId(instructor)) {
-    res.status(400).json({ error: 'instructor must be a valid ObjectId' });
+  if (!title || !description || !category) {
+    res.status(400).json({ error: 'title, description, and category are required' });
     return;
   }
 
-  const course = await Course.create({ title, description, instructor, category, published });
+  const course = await Course.create({
+    title,
+    description,
+    instructor: req.user!.userId,
+    category,
+    published,
+  });
   res.status(201).json({ data: course });
 }
 
@@ -67,17 +68,23 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const body = req.body as Partial<Pick<ICourse, 'title' | 'description' | 'category' | 'published' | 'instructor'>>;
-  const course = await Course.findByIdAndUpdate(id, body, {
-    new: true,
-    runValidators: true,
-  }).populate('instructor', 'name email');
-
+  const course = await Course.findById(id);
   if (!course) {
     res.status(404).json({ error: 'Course not found' });
     return;
   }
-  res.json({ data: course });
+  if (course.instructor.toString() !== req.user!.userId) {
+    res.status(403).json({ error: 'You do not own this course' });
+    return;
+  }
+
+  const body = req.body as Partial<Pick<ICourse, 'title' | 'description' | 'category' | 'published'>>;
+  const updated = await Course.findByIdAndUpdate(id, body, {
+    new: true,
+    runValidators: true,
+  }).populate('instructor', 'name email');
+
+  res.json({ data: updated });
 }
 
 export async function deleteCourse(req: Request, res: Response): Promise<void> {
@@ -87,12 +94,17 @@ export async function deleteCourse(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const course = await Course.findByIdAndDelete(id);
+  const course = await Course.findById(id);
   if (!course) {
     res.status(404).json({ error: 'Course not found' });
     return;
   }
+  if (course.instructor.toString() !== req.user!.userId) {
+    res.status(403).json({ error: 'You do not own this course' });
+    return;
+  }
 
+  await Course.findByIdAndDelete(id);
   const { deletedCount } = await Lesson.deleteMany({ courseId: id });
   res.json({ data: { message: 'Course and its lessons deleted', lessonsDeleted: deletedCount } });
 }

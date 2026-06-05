@@ -7,6 +7,12 @@ function validId(id: string): boolean {
   return mongoose.isValidObjectId(id);
 }
 
+async function ownsCourse(courseId: string, userId: string): Promise<boolean | null> {
+  const course = await Course.findById(courseId);
+  if (!course) return null;
+  return course.instructor.toString() === userId;
+}
+
 interface CreateLessonBody {
   title?: string;
   content?: string;
@@ -21,9 +27,13 @@ export async function createLesson(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const exists = await Course.exists({ _id: courseId });
-  if (!exists) {
+  const owns = await ownsCourse(courseId, req.user!.userId);
+  if (owns === null) {
     res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  if (!owns) {
+    res.status(403).json({ error: 'You do not own this course' });
     return;
   }
 
@@ -70,16 +80,28 @@ export async function updateLesson(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const body = req.body as Partial<Pick<ILesson, 'title' | 'content' | 'videoUrl' | 'order'>>;
-  const lesson = await Lesson.findByIdAndUpdate(id, body, {
-    new: true,
-    runValidators: true,
-  });
+  const lesson = await Lesson.findById(id);
   if (!lesson) {
     res.status(404).json({ error: 'Lesson not found' });
     return;
   }
-  res.json({ data: lesson });
+
+  const owns = await ownsCourse(lesson.courseId.toString(), req.user!.userId);
+  if (owns === null) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  if (!owns) {
+    res.status(403).json({ error: 'You do not own this course' });
+    return;
+  }
+
+  const body = req.body as Partial<Pick<ILesson, 'title' | 'content' | 'videoUrl' | 'order'>>;
+  const updated = await Lesson.findByIdAndUpdate(id, body, {
+    new: true,
+    runValidators: true,
+  });
+  res.json({ data: updated });
 }
 
 export async function deleteLesson(req: Request, res: Response): Promise<void> {
@@ -89,10 +111,22 @@ export async function deleteLesson(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const lesson = await Lesson.findByIdAndDelete(id);
+  const lesson = await Lesson.findById(id);
   if (!lesson) {
     res.status(404).json({ error: 'Lesson not found' });
     return;
   }
+
+  const owns = await ownsCourse(lesson.courseId.toString(), req.user!.userId);
+  if (owns === null) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  if (!owns) {
+    res.status(403).json({ error: 'You do not own this course' });
+    return;
+  }
+
+  await Lesson.findByIdAndDelete(id);
   res.json({ data: { message: 'Lesson deleted' } });
 }
